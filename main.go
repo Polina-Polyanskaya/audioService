@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,12 +12,21 @@ import (
 	"os"
 )
 
+type Answer struct{
+	Error string `json:"error"`
+	Names []string `json:"names"`
+}
+
 func main() {
+	/*
 	getInApp("http://127.0.0.1:8080/getInApp/enter","POST",[]byte(`{
     "loginOfUser": "m4",
-    "passwordOfUser": "1243"
+    "passwordOfUser": "1243",
+	"namesOfSongs": []
 }`))
-	sendAudio("http://127.0.0.1:8080/audio", "D:\\mus.mp3","m4","1243","music")
+
+	 */
+	sendAudio("http://127.0.0.1:8080/audio", "D:\\mus.mp3","m15","naaaame","music5")
 }
 
 func getInApp(url string, method string, data [] byte){
@@ -90,4 +100,12 @@ func sendAudio(ip string, fileName string, login string, password string, nameOf
 	defer resp.Body.Close()
 	body, _ := ioutil.ReadAll(resp.Body)
 	fmt.Println("response Body:", string(body))
+	var answer Answer
+	err = json.Unmarshal(body, &answer)
+	if err != nil {
+
+		log.Fatal(err)
+	}
+	fmt.Println(answer.Error)
+	fmt.Println(answer.Names[0]," ",answer.Names)
 }
