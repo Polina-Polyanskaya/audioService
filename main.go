@@ -4,39 +4,49 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
-	"mime/multipart"
 	"net/http"
 	"os"
 )
 
+type newSong struct{
+	Login string `json:"login"`
+	Password string `json:"password"`
+	Name string `json:"name"`
+	Mp3File []byte `json:"file"`
+}
+
+type User struct{
+	Login string `json:"login"`
+	Password string `json:"password"`
+}
+
 type Answer struct{
-	Error string `json:"error"`
-	Names []string `json:"names"`
+	Login string `json:"login"`
+	Names []string   `json:"names"`
+	Mp3Files [][]byte `json:"files"`
 }
 
 func main() {
-	/*
-	getInApp("http://127.0.0.1:8080/getInApp/enter","POST",[]byte(`{
-    "loginOfUser": "m4",
-    "passwordOfUser": "1243",
-	"namesOfSongs": []
-}`))
-
-	 */
-	sendAudio("http://127.0.0.1:8080/audio", "D:\\mus.mp3","m15","naaaame","music5")
+	getInApp("http://127.0.0.1:8080/getInApp/registration","POST","m6", "1243")
+	addAudio("http://127.0.0.1:8080/audio/addSong", "D:\\music/mus3.mp3","m6","1243","music0010")
+	getAudios("http://127.0.0.1:8080/audio/getNamesOfSongs", "m6","1243")
 }
 
-func getInApp(url string, method string, data [] byte){
+func getInApp(url string, method string, login string, password string){
+	data, _ := json.Marshal(User{
+		Login:    login,
+		Password: password,
+	})
 	reader := bytes.NewReader(data)
 	req, err := http.NewRequest(method, url, reader)
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return
 	}
 	defer resp.Body.Close()
 
@@ -46,66 +56,70 @@ func getInApp(url string, method string, data [] byte){
 	fmt.Println("response Body:", string(body))
 }
 
-func sendAudio(ip string, fileName string, login string, password string, nameOfSong string) {
-	file, err := os.Open(fileName)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	defer file.Close()
-	var requestBody bytes.Buffer
-	multiPartWriter := multipart.NewWriter(&requestBody)
-	fileWriter, err := multiPartWriter.CreateFormFile("audioFile", fileName)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	_, err = io.Copy(fileWriter, file)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	fieldWriter, err := multiPartWriter.CreateFormField("login")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	_, err = fieldWriter.Write([]byte(login))
-	if err != nil {
-		log.Fatalln(err)
-	}
-	fieldWriter, err = multiPartWriter.CreateFormField("password")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	_, err = fieldWriter.Write([]byte(password))
-	if err != nil {
-		log.Fatalln(err)
-	}
-	fieldWriter, err = multiPartWriter.CreateFormField("nameOfSong")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	_, err = fieldWriter.Write([]byte(nameOfSong))
-	if err != nil {
-		log.Fatalln(err)
-	}
-	multiPartWriter.Close()
-	req, err := http.NewRequest("POST", ip, &requestBody)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	req.Header.Set("Content-Type", multiPartWriter.FormDataContentType())
+func getAudios(path string, login string, password string){
+	data, _ := json.Marshal(User{
+		Login:    login,
+		Password: password,
+	})
+	reader := bytes.NewReader(data)
+	req, err := http.NewRequest("POST", path, reader)
+	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Fatalln(err)
+		log.Println("Error in client")
+		return
 	}
 	defer resp.Body.Close()
+	fmt.Println("response Status:", resp.Status)
+	fmt.Println("response Headers:", resp.Header)
 	body, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println("response Body:", string(body))
+
 	var answer Answer
 	err = json.Unmarshal(body, &answer)
 	if err != nil {
-
-		log.Fatal(err)
+		log.Println("Error in unmarshal")
+	} else {
+		os.RemoveAll("D:\\users/"+answer.Login)
+		err = os.MkdirAll("D:\\users/"+answer.Login, 0777)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		for index, elem := range answer.Mp3Files {
+			err:=ioutil.WriteFile("D:\\users/"+answer.Login+"/"+answer.Names[index]+".mp3",elem,0644)
+			if err!=nil{
+				log.Println(err)
+				return
+			}
+		}
 	}
-	fmt.Println(answer.Error)
-	fmt.Println(answer.Names[0]," ",answer.Names)
+}
+
+func addAudio(path string, fileName string, login string, password string, nameOfSong string) {
+	file, err := ioutil.ReadFile(fileName)
+	if err!=nil{
+		log.Println("Error in reading file")
+		return
+	}
+	data, _ := json.Marshal(newSong{
+		Login:    login,
+		Password: password,
+		Name:     nameOfSong,
+		Mp3File:  file,
+	})
+	reader := bytes.NewReader(data)
+	req, err := http.NewRequest("POST", path, reader)
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("Error in client")
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println("response Status:", resp.Status)
+	fmt.Println("response Headers:", resp.Header)
+	body, _ := ioutil.ReadAll(resp.Body)
+	fmt.Println("response Body:", string(body))
 }
